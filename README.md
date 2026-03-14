@@ -388,7 +388,7 @@ Commercial use is permitted with attribution. Healthcare institutions can deploy
 
 - **Issues**: [GitHub Issues](https://github.com/spoorthy142005-dev/Hackathon-code/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/spoorthy142005-dev/Hackathon-code/discussions)
-- **Email**: [Your contact email]
+- **Email**: [Your contact email]spoorthy142005@gmail.com
 
 ---
 
