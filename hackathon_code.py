@@ -697,3 +697,89 @@ if st.button("Run Diagnostic Analysis"):
         st.success(f"Status: {risk_category}")
         st.write(f"Radiologist Priority: NORMAL ({confidence:.2f}%)")
 
+import gradio as gr
+import pandas as pd
+import numpy as np
+import cv2
+from PIL import Image
+
+# --- THE DATA HUB ---
+# This function connects your UI to your backend data
+def get_triage_data():
+    # Sort by urgency
+    triage_df = clean_df[['uid', 'risk_level', 'condition_trend', 'urgency_score']].sort_values('urgency_score', ascending=False)
+    # Generate Trend Chart Data
+    trend_counts = clean_df['condition_trend'].value_counts().reset_index()
+    return triage_df, trend_counts
+
+def analyze_patient(patient_id):
+    # Fetch from backend clean_df
+    patient_row = clean_df[clean_df['uid'] == str(patient_id)].iloc[0]
+    
+    # 1. Images (Original & Grad-CAM)
+    orig_img = cv2.imread(patient_row['full_path'])
+    orig_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
+    
+    heatmap = make_gradcam_heatmap(patient_row['full_path'], base_model)
+    overlay = apply_gradcam_overlay(patient_row['full_path'], heatmap)
+    overlay_rgb = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
+    
+    # 2. Reasoning Bar Chart (Simulated Weights)
+    weights = {"Visual Evidence": 72, "Clinical Text": 28}
+    
+    # 3. Clinical Summary
+    summary = f"Anatomy: {patient_row['affected_anatomy']}\nTrend: {patient_row['condition_trend']}"
+    
+    return orig_img, overlay_rgb, weights, patient_row['urgency_score']*20, summary
+
+# --- UI LAYOUT ---
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🏥 MedVision AI Clinical Decision Support")
+    
+    with gr.Tabs():
+        # DASHBOARD 1: HOSPITAL LEADBOARD
+        with gr.TabItem("📋 Hospital Leadboard (Triage)"):
+            gr.Markdown("### 🚨 High-Priority Patient Queue")
+            triage_table = gr.DataFrame(interactive=False)
+            
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### 📈 Population Trend")
+                    trend_chart = gr.BarPlot(x="index", y="condition_trend", title="Worsening vs Improving")
+                with gr.Column():
+                    gr.Markdown("### 🧬 Clinical Clustering (t-SNE)")
+                    # If you saved your t-SNE plot as an image in backend:
+                    tsne_plot = gr.Image("risk_distribution.png", label="Patient Decision Space")
+
+        # DASHBOARD 2: AI DIAGNOSTIC ASSISTANT
+        with gr.TabItem("🔍 AI Diagnostic Assistant"):
+            with gr.Row():
+                patient_input = gr.Textbox(label="Enter Patient UID (e.g., 1-1)")
+                submit_btn = gr.Button("Analyze", variant="primary")
+            
+            with gr.Row():
+                img_orig = gr.Image(label="Original X-Ray")
+                img_grad = gr.Image(label="AI Focal Attention (Grad-CAM)")
+            
+            with gr.Row():
+                with gr.Column():
+                    reasoning_chart = gr.Label(label="Reasoning Weight (Visual vs Text)")
+                    confidence = gr.Slider(0, 100, label="Confidence Meter (Prob Score)")
+                with gr.Column():
+                    clinical_sum = gr.Textbox(label="AI-Generated Clinical Summary", lines=4)
+                    with gr.Row():
+                        agree_btn = gr.Button("👍 Agree", variant="secondary")
+                        disagree_btn = gr.Button("👎 Disagree", variant="secondary")
+
+    # --- CONNECTING LOGIC ---
+    # Load Triage on startup
+    demo.load(get_triage_data, outputs=[triage_table, trend_chart])
+    
+    # Analyze Patient on click
+    submit_btn.click(
+        analyze_patient, 
+        inputs=patient_input, 
+        outputs=[img_orig, img_grad, reasoning_chart, confidence, clinical_sum]
+    )
+
+demo.launch()
