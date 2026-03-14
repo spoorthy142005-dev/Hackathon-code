@@ -738,6 +738,32 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     
     with gr.Tabs():
         # DASHBOARD 1: HOSPITAL LEADBOARD
+        def get_analytics_plots():
+            # 1. Risk Level Distribution
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            sns.countplot(data=clean_df, x='risk_level', hue='risk_level', palette='viridis', legend=False, ax=ax1)
+            ax1.set_title('Distribution of Patient Risk Levels')
+            
+            # 2. Specific Findings (Cardiomegaly/Effusion)
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            conditions = ['has_cardiomegaly', 'has_effusion']
+            counts = clean_df[conditions].sum()
+            counts.plot(kind='bar', color='skyblue', ax=ax2)
+            ax2.set_title('Frequency of Medical Findings')
+            plt.xticks(rotation=0)
+            
+            # 3. t-SNE Scatter Plot
+            fig3, ax3 = plt.subplots(figsize=(6, 4))
+            sns.scatterplot(
+                x=tsne_results[:, 0], 
+                y=tsne_results[:, 1],
+                hue=clean_df['risk_level'], 
+                palette='RdYlGn_r', 
+                alpha=0.7, ax=ax3
+            )
+            ax3.set_title('Clinical Clustering (t-SNE)')
+            
+    return fig1, fig2, fig3
         with gr.TabItem("📋 Hospital Leadboard (Triage)"):
             gr.Markdown("### 🚨 High-Priority Patient Queue")
             triage_table = gr.DataFrame(interactive=False)
@@ -752,6 +778,30 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                     tsne_plot = gr.Image("risk_distribution.png", label="Patient Decision Space")
 
         # DASHBOARD 2: AI DIAGNOSTIC ASSISTANT
+        Deep-Dive ---
+        def analyze_patient(patient_id):
+            # Search for patient
+            patient_row = clean_df[clean_df['uid'] == str(patient_id)].iloc[0]
+            img_path = patient_row['full_path']
+            
+            # 1. FETCH IMAGES
+            # Original
+            orig_img = cv2.imread(img_path)
+            orig_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
+            
+            # Grad-CAM (Using your backend functions)
+            heatmap = make_gradcam_heatmap(img_path, base_model)
+            overlay = apply_gradcam_overlay(img_path, heatmap)
+            # IMPORTANT: Convert BGR to RGB so it's not blue!
+            overlay_rgb = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
+            
+            # 2. Reasoning (Example Weights)
+            reasoning = {"Visual Evidence": 0.75, "Clinical Text": 0.25}
+            
+            # 3. Clinical Summary
+            summary = f"Anatomy: {patient_row['affected_anatomy']}\nTrend: {patient_row['condition_trend']}\nUrgency: {patient_row['urgency_score']}/5"
+            
+            return orig_img, overlay_rgb, reasoning, summary
         with gr.TabItem("🔍 AI Diagnostic Assistant"):
             with gr.Row():
                 patient_input = gr.Textbox(label="Enter Patient UID (e.g., 1-1)")
@@ -770,6 +820,94 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                     with gr.Row():
                         agree_btn = gr.Button("👍 Agree", variant="secondary")
                         disagree_btn = gr.Button("👎 Disagree", variant="secondary")
+    # --- GRADIO UI ---
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🏥 AI Clinical Decision Support System")
+    
+    with gr.Tabs():
+        # TAB 1: TRIAGE & ANALYTICS
+        with gr.TabItem("📊 Population Analytics"):
+            with gr.Row():
+                plot_risk = gr.Plot(label="Risk Distribution")
+                plot_findings = gr.Plot(label="Finding Counts")
+            plot_tsne = gr.Plot(label="Clinical Decision Space (t-SNE)")
+            refresh_btn = gr.Button("Load Analytics")
+            refresh_btn.click(get_analytics_plots, outputs=[plot_risk, plot_findings, plot_tsne])
+
+        # TAB 2: DIAGNOSTIC ASSISTANT
+        with gr.TabItem("🔍 Patient Deep-Dive"):
+            with gr.Row():
+                patient_id_input = gr.Textbox(label="Enter Patient UID", value="1-1")
+                btn_analyze = gr.Button("Run Diagnostic", variant="primary")
+            
+            with gr.Row():
+                out_orig = gr.Image(label="Original X-Ray")
+                out_grad = gr.Image(label="AI Focal Attention (Grad-CAM)")
+            
+            with gr.Row():
+                out_reasoning = gr.Label(label="AI Reasoning Weights")
+                out_summary = gr.Textbox(label="Clinical Summary", lines=4)
+
+    # --- GRADIO UI ---
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🏥 AI Clinical Decision Support System")
+    
+    with gr.Tabs():
+        # TAB 1: TRIAGE & ANALYTICS
+        with gr.TabItem("📊 Population Analytics"):
+            with gr.Row():
+                plot_risk = gr.Plot(label="Risk Distribution")
+                plot_findings = gr.Plot(label="Finding Counts")
+            plot_tsne = gr.Plot(label="Clinical Decision Space (t-SNE)")
+            refresh_btn = gr.Button("Load Analytics")
+            refresh_btn.click(get_analytics_plots, outputs=[plot_risk, plot_findings, plot_tsne])
+
+        # TAB 2: DIAGNOSTIC ASSISTANT
+        with gr.TabItem("🔍 Patient Deep-Dive"):
+            with gr.Row():
+                patient_id_input = gr.Textbox(label="Enter Patient UID", value="1-1")
+                btn_analyze = gr.Button("Run Diagnostic", variant="primary")
+            
+            with gr.Row():
+                out_orig = gr.Image(label="Original X-Ray")
+                out_grad = gr.Image(label="AI Focal Attention (Grad-CAM)")
+            
+            with gr.Row():
+                out_reasoning = gr.Label(label="AI Reasoning Weights")
+                out_summary = gr.Textbox(label="Clinical Summary", lines=4)
+   with gr.Blocks(theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🏥 AI Clinical Decision Support System")
+    
+    with gr.Tabs():
+        # TAB 1: TRIAGE & ANALYTICS
+        with gr.TabItem("📊 Population Analytics"):
+            with gr.Row():
+                plot_risk = gr.Plot(label="Risk Distribution")
+                plot_findings = gr.Plot(label="Finding Counts")
+            plot_tsne = gr.Plot(label="Clinical Decision Space (t-SNE)")
+            refresh_btn = gr.Button("Load Analytics")
+            refresh_btn.click(get_analytics_plots, outputs=[plot_risk, plot_findings, plot_tsne])
+
+        # TAB 2: DIAGNOSTIC ASSISTANT
+        with gr.TabItem("🔍 Patient Deep-Dive"):
+            with gr.Row():
+                patient_id_input = gr.Textbox(label="Enter Patient UID", value="1-1")
+                btn_analyze = gr.Button("Run Diagnostic", variant="primary")
+            
+            with gr.Row():
+                out_orig = gr.Image(label="Original X-Ray")
+                out_grad = gr.Image(label="AI Focal Attention (Grad-CAM)")
+            
+            with gr.Row():
+                out_reasoning = gr.Label(label="AI Reasoning Weights")
+                out_summary = gr.Textbox(label="Clinical Summary", lines=4)
+
+        # ACTIONS
+    btn_analyze.click(
+        analyze_patient, 
+        inputs=patient_id_input, 
+        outputs=[out_orig, out_grad, out_reasoning, out_summary]
+    )
 
     # --- CONNECTING LOGIC ---
     # Load Triage on startup
